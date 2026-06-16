@@ -1,0 +1,67 @@
+;
+; lockguard.inf — install file for the Lockguard kernel driver.
+;
+; Used by the Install-Lockguard.ps1 only as documentation / fallback;
+; the script registers the service directly via `sc create` so it can set
+; SERVICE_BOOT_START and SafeBoot membership in one shot, which the .inf
+; install path doesn't expose cleanly.
+;
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = ActivityMonitor
+ClassGuid   = {b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}
+Provider    = %ProviderName%
+DriverVer   = 01/01/2026,1.0.0.0
+CatalogFile = lockguard.cat
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir          = 12
+Lockguard.DriverFiles   = 12   ; %windir%\system32\drivers
+
+[DefaultInstall.NTamd64]
+OptionDesc = %ServiceDescription%
+CopyFiles  = Lockguard.DriverFiles
+
+[DefaultInstall.NTamd64.Services]
+AddService = %ServiceName%,, Lockguard.Service
+
+[DefaultUninstall.NTamd64]
+LegacyUninstall = 1
+DelFiles = Lockguard.DriverFiles
+
+[DefaultUninstall.NTamd64.Services]
+DelService = %ServiceName%, 0x200    ; SPSVCINST_STOPSERVICE
+
+[Lockguard.Service]
+DisplayName    = %ServiceName%
+Description    = %ServiceDescription%
+ServiceBinary  = %12%\lockguard.sys
+ServiceType    = 1                   ; SERVICE_KERNEL_DRIVER
+StartType      = 0                   ; SERVICE_BOOT_START
+ErrorControl   = 1                   ; SERVICE_ERROR_NORMAL
+LoadOrderGroup = "FSFilter Activity Monitor"
+AddReg         = Lockguard.AddReg
+
+[Lockguard.AddReg]
+HKR,"Instances","DefaultInstance",,        %DefaultInstance%
+HKR,"Instances\"%DefaultInstance%,"Altitude",, %Altitude%
+HKR,"Instances\"%DefaultInstance%,"Flags",  0x00010001, 0
+
+[Lockguard.DriverFiles]
+lockguard.sys
+
+[SourceDisksFiles]
+lockguard.sys = 1,,
+
+[SourceDisksNames]
+1 = %DiskName%,,
+
+[Strings]
+ProviderName        = "Lockguard"
+ServiceName         = "Lockguard"
+ServiceDescription  = "Lockguard kernel protection driver"
+DefaultInstance     = "Lockguard Instance"
+Altitude            = "360100"
+DiskName            = "Lockguard Installation Disk"

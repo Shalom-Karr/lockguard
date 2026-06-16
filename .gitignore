@@ -1,0 +1,40 @@
+# Build outputs
+bin/
+obj/
+*.exe
+*.sys
+*.cer
+*.pfx
+*.cip
+*.cat
+*.pdb
+*.exp
+*.ilk
+*.lib
+*.tlog
+*.log
+*.tmp
+
+# Go
+/watchdog/lockguard-svc.exe
+/cli/lockguard-cli.exe
+vendor/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Bundle staging — distribute via Releases, not in tree
+bundle/
+
+# Certs (NEVER commit private keys)
+certs/
+
+# Editor cruft
+.idea/
+.vscode/
+*.swp
+*~
+Thumbs.db
+.DS_Store

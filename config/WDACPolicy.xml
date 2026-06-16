@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WDACPolicy.xml — Lockguard Windows Defender Application Control policy.
+
+  Whitelists:
+    - winword.exe (any version — by FileName + Microsoft publisher rule)
+    - explorer.exe + Windows essentials in %WINDIR%\System32
+    - msedge.exe (for local PDF viewing)
+    - lockguard.sys + lockguard-svc.exe + lockguard-cli.exe (our own bins)
+
+  Denies (explicit, win over Windows defaults):
+    - cmd.exe, powershell.exe, powershell_ise.exe, wscript.exe, cscript.exe
+    - mshta.exe, regedit.exe, taskmgr.exe, bcdedit.exe, sc.exe, net.exe
+    - All scripting hosts the friend could use to bootstrap something else.
+
+  Compile with:
+    ConvertFrom-CIPolicy -XmlFilePath WDACPolicy.xml -BinaryFilePath WDACPolicy.cip
+
+  The installer (Install-Lockguard.ps1) is responsible for first deploying
+  this in audit mode (no enforcement, logs blocks to event log) for a soak,
+  then flipping the policy options on second run to switch to enforce mode.
+-->
+<SiPolicy xmlns="urn:schemas-microsoft-com:sipolicy">
+  <VersionEx>1.0.0.0</VersionEx>
+  <PolicyTypeID>{A244370E-44C9-4C06-B551-F6016E563076}</PolicyTypeID>
+  <PlatformID>{2E07F7E4-194C-4D20-B7C9-6F44A6C5A234}</PlatformID>
+  <PolicyID>{4d5e3d7e-1f2a-4b3c-8a9b-1d2e3f4a5b6c}</PolicyID>
+  <BasePolicyID>{4d5e3d7e-1f2a-4b3c-8a9b-1d2e3f4a5b6c}</BasePolicyID>
+
+  <Rules>
+    <Rule><Option>Enabled:Unsigned System Integrity Policy</Option></Rule>
+    <Rule><Option>Enabled:UMCI</Option></Rule>
+    <Rule><Option>Required:Enforce Store Applications</Option></Rule>
+    <Rule><Option>Disabled:Script Enforcement</Option></Rule>
+    <!-- Flip this Allow-Audit flag off (delete) for the second run to enforce. -->
+    <Rule><Option>Enabled:Audit Mode</Option></Rule>
+  </Rules>
+
+  <EKUs />
+
+  <FileRules>
+    <Allow ID="ID_ALLOW_WINWORD"    FriendlyName="Microsoft Word"    FileName="WINWORD.EXE" />
+    <Allow ID="ID_ALLOW_EXPLORER"   FriendlyName="Explorer"          FileName="EXPLORER.EXE" />
+    <Allow ID="ID_ALLOW_MSEDGE"     FriendlyName="Microsoft Edge"    FileName="MSEDGE.EXE" />
+    <Allow ID="ID_ALLOW_NOTEPAD"    FriendlyName="Notepad"           FileName="NOTEPAD.EXE" />
+    <Allow ID="ID_ALLOW_PRINTUI"    FriendlyName="Print Dialog"      FileName="PRINTUI.EXE" />
+    <Allow ID="ID_ALLOW_RUNDLL32"   FriendlyName="rundll32"          FileName="RUNDLL32.EXE" />
+    <Allow ID="ID_ALLOW_SPOOLSV"    FriendlyName="Print Spooler"     FileName="SPOOLSV.EXE" />
+    <Allow ID="ID_ALLOW_SVCHOST"    FriendlyName="Service Host"      FileName="SVCHOST.EXE" />
+    <Allow ID="ID_ALLOW_DWM"        FriendlyName="Desktop Window Mgr" FileName="DWM.EXE" />
+    <Allow ID="ID_ALLOW_LOGONUI"    FriendlyName="LogonUI"           FileName="LOGONUI.EXE" />
+    <Allow ID="ID_ALLOW_LSASS"      FriendlyName="LSASS"             FileName="LSASS.EXE" />
+    <Allow ID="ID_ALLOW_CSRSS"      FriendlyName="CSRSS"             FileName="CSRSS.EXE" />
+    <Allow ID="ID_ALLOW_WINLOGON"   FriendlyName="winlogon"          FileName="WINLOGON.EXE" />
+    <Allow ID="ID_ALLOW_SERVICES"   FriendlyName="services.exe"      FileName="SERVICES.EXE" />
+    <Allow ID="ID_ALLOW_SMSS"       FriendlyName="Session Manager"   FileName="SMSS.EXE" />
+    <Allow ID="ID_ALLOW_WININIT"    FriendlyName="wininit"           FileName="WININIT.EXE" />
+    <Allow ID="ID_ALLOW_FONTDRVHOST" FriendlyName="fontdrvhost"      FileName="FONTDRVHOST.EXE" />
+    <Allow ID="ID_ALLOW_RUNTIMEBROKER" FriendlyName="RuntimeBroker"  FileName="RUNTIMEBROKER.EXE" />
+    <Allow ID="ID_ALLOW_LOCKGUARD_SVC" FriendlyName="lockguard-svc"  FileName="LOCKGUARD-SVC.EXE" />
+    <Allow ID="ID_ALLOW_LOCKGUARD_CLI" FriendlyName="lockguard-cli"  FileName="LOCKGUARD-CLI.EXE" />
+
+    <Deny  ID="ID_DENY_CMD"         FriendlyName="cmd"               FileName="CMD.EXE" />
+    <Deny  ID="ID_DENY_POWERSHELL"  FriendlyName="powershell"        FileName="POWERSHELL.EXE" />
+    <Deny  ID="ID_DENY_POWERSHELL_ISE" FriendlyName="powershell_ise" FileName="POWERSHELL_ISE.EXE" />
+    <Deny  ID="ID_DENY_WSCRIPT"     FriendlyName="wscript"           FileName="WSCRIPT.EXE" />
+    <Deny  ID="ID_DENY_CSCRIPT"     FriendlyName="cscript"           FileName="CSCRIPT.EXE" />
+    <Deny  ID="ID_DENY_MSHTA"       FriendlyName="mshta"             FileName="MSHTA.EXE" />
+    <Deny  ID="ID_DENY_REGEDIT"    FriendlyName="regedit"            FileName="REGEDIT.EXE" />
+    <Deny  ID="ID_DENY_TASKMGR"    FriendlyName="taskmgr"            FileName="TASKMGR.EXE" />
+    <Deny  ID="ID_DENY_BCDEDIT"    FriendlyName="bcdedit"            FileName="BCDEDIT.EXE" />
+    <Deny  ID="ID_DENY_SC"         FriendlyName="sc"                 FileName="SC.EXE" />
+    <Deny  ID="ID_DENY_NET"        FriendlyName="net"                FileName="NET.EXE" />
+    <Deny  ID="ID_DENY_NET1"       FriendlyName="net1"               FileName="NET1.EXE" />
+    <Deny  ID="ID_DENY_NETSH"      FriendlyName="netsh"              FileName="NETSH.EXE" />
+    <Deny  ID="ID_DENY_REG"        FriendlyName="reg"                FileName="REG.EXE" />
+  </FileRules>
+
+  <Signers />
+
+  <SigningScenarios>
+    <SigningScenario Value="131" ID="ID_SIGNINGSCENARIO_DRIVERS" FriendlyName="Driver Auto-allow">
+      <ProductSigners />
+    </SigningScenario>
+    <SigningScenario Value="12"  ID="ID_SIGNINGSCENARIO_WINDOWS" FriendlyName="User mode">
+      <ProductSigners>
+        <FileRulesRef>
+          <FileRuleRef RuleID="ID_ALLOW_WINWORD" />
+          <FileRuleRef RuleID="ID_ALLOW_EXPLORER" />
+          <FileRuleRef RuleID="ID_ALLOW_MSEDGE" />
+          <FileRuleRef RuleID="ID_ALLOW_NOTEPAD" />
+          <FileRuleRef RuleID="ID_ALLOW_PRINTUI" />
+          <FileRuleRef RuleID="ID_ALLOW_RUNDLL32" />
+          <FileRuleRef RuleID="ID_ALLOW_SPOOLSV" />
+          <FileRuleRef RuleID="ID_ALLOW_SVCHOST" />
+          <FileRuleRef RuleID="ID_ALLOW_DWM" />
+          <FileRuleRef RuleID="ID_ALLOW_LOGONUI" />
+          <FileRuleRef RuleID="ID_ALLOW_LSASS" />
+          <FileRuleRef RuleID="ID_ALLOW_CSRSS" />
+          <FileRuleRef RuleID="ID_ALLOW_WINLOGON" />
+          <FileRuleRef RuleID="ID_ALLOW_SERVICES" />
+          <FileRuleRef RuleID="ID_ALLOW_SMSS" />
+          <FileRuleRef RuleID="ID_ALLOW_WININIT" />
+          <FileRuleRef RuleID="ID_ALLOW_FONTDRVHOST" />
+          <FileRuleRef RuleID="ID_ALLOW_RUNTIMEBROKER" />
+          <FileRuleRef RuleID="ID_ALLOW_LOCKGUARD_SVC" />
+          <FileRuleRef RuleID="ID_ALLOW_LOCKGUARD_CLI" />
+
+          <FileRuleRef RuleID="ID_DENY_CMD" />
+          <FileRuleRef RuleID="ID_DENY_POWERSHELL" />
+          <FileRuleRef RuleID="ID_DENY_POWERSHELL_ISE" />
+          <FileRuleRef RuleID="ID_DENY_WSCRIPT" />
+          <FileRuleRef RuleID="ID_DENY_CSCRIPT" />
+          <FileRuleRef RuleID="ID_DENY_MSHTA" />
+          <FileRuleRef RuleID="ID_DENY_REGEDIT" />
+          <FileRuleRef RuleID="ID_DENY_TASKMGR" />
+          <FileRuleRef RuleID="ID_DENY_BCDEDIT" />
+          <FileRuleRef RuleID="ID_DENY_SC" />
+          <FileRuleRef RuleID="ID_DENY_NET" />
+          <FileRuleRef RuleID="ID_DENY_NET1" />
+          <FileRuleRef RuleID="ID_DENY_NETSH" />
+          <FileRuleRef RuleID="ID_DENY_REG" />
+        </FileRulesRef>
+      </ProductSigners>
+    </SigningScenario>
+  </SigningScenarios>
+
+  <UpdatePolicySigners />
+  <CiSigners />
+  <HvciOptions>0</HvciOptions>
+
+  <Settings>
+    <Setting Provider="PolicyInfo" Key="Information" ValueName="Name">
+      <Value><String>Lockguard WDAC Policy</String></Value>
+    </Setting>
+    <Setting Provider="PolicyInfo" Key="Information" ValueName="Id">
+      <Value><String>Lockguard-v1</String></Value>
+    </Setting>
+  </Settings>
+</SiPolicy>

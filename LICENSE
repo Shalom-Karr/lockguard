@@ -1,0 +1,48 @@
+PROPRIETARY LICENSE — ALL RIGHTS RESERVED
+
+Copyright (c) 2026 Shalom Karr. All rights reserved.
+
+This software and all associated source code, documentation, configuration
+files, scripts, build outputs, and derivative materials (collectively, "the
+Software") are the exclusive property of Shalom Karr.
+
+NO PERMISSION IS GRANTED to any person or entity to use, copy, modify,
+merge, publish, distribute, sublicense, run, install, deploy, link
+against, vendor, fork for use, or sell the Software, in whole or in part,
+in any form, for any purpose — including but not limited to personal,
+private, internal, educational, academic, research, evaluation, hobby,
+non-commercial, or commercial use — without express prior written
+permission from Shalom Karr.
+
+Mere access to this repository (whether viewed via the public GitHub
+listing, cloned, forked, mirrored, or obtained through any other channel)
+does not constitute permission to use the Software. Building from source,
+running any compiled artifact, or deploying any component for any purpose
+beyond reading the source on github.com requires written authorization
+obtained in advance.
+
+Permission requests must be sent to Shalom Karr and must specify:
+  - the requester's full legal identity,
+  - the intended use case,
+  - the duration of intended use,
+  - the scope (number of machines, users, and deployments),
+  - a contact address for revocation notices.
+
+Any granted permission is personal, non-transferable, non-sublicensable,
+revocable at any time without cause, and limited to the exact scope
+described in the written authorization. Permission for one use does not
+imply permission for any other.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES,
+OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE,
+ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+Unauthorized use, reproduction, distribution, or deployment of the
+Software is a violation of United States and international copyright law
+and may result in civil and criminal penalties.
+
+For permission requests, contact: Shalom Karr.

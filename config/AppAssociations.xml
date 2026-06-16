@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AppAssociations.xml — default file associations Lockguard enforces.
+
+  Imported via DISM:
+    dism /online /import-defaultappassociations:AppAssociations.xml
+
+  Locked via Group Policy registry value:
+    HKLM\Software\Policies\Microsoft\Windows\System\DefaultAssociationsConfiguration
+      = "C:\ProgramData\Lockguard\config\AppAssociations.xml"
+
+  The watchdog re-imports on drift.
+-->
+<DefaultAssociations>
+
+  <!-- Productive types -->
+  <Association Identifier=".pdf"  ProgId="MSEdgePDF"         ApplicationName="Microsoft Edge" />
+  <Association Identifier=".doc"  ProgId="Word.Document.8"   ApplicationName="Microsoft Word" />
+  <Association Identifier=".docx" ProgId="Word.Document.12"  ApplicationName="Microsoft Word" />
+  <Association Identifier=".docm" ProgId="Word.DocumentMacroEnabled.12" ApplicationName="Microsoft Word" />
+  <Association Identifier=".rtf"  ProgId="Word.RTF.8"        ApplicationName="Microsoft Word" />
+  <Association Identifier=".txt"  ProgId="txtfile"           ApplicationName="Notepad" />
+  <Association Identifier=".log"  ProgId="txtfile"           ApplicationName="Notepad" />
+
+  <!-- Audio: open as text so they're inert -->
+  <Association Identifier=".mp3"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".wav"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".flac" ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".m4a"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".aac"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".ogg"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".wma"  ProgId="txtfile" ApplicationName="Notepad" />
+
+  <!-- Video: same -->
+  <Association Identifier=".mp4"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".mkv"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".avi"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".mov"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".webm" ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".wmv"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".flv"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".m4v"  ProgId="txtfile" ApplicationName="Notepad" />
+
+  <!-- Images: Notepad fallback to discourage browsing -->
+  <Association Identifier=".jpg"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".jpeg" ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".png"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".gif"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".webp" ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".bmp"  ProgId="txtfile" ApplicationName="Notepad" />
+
+  <!-- Browsing-adjacent and risky: also Notepad -->
+  <Association Identifier=".html" ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".htm"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".url"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".lnk"  ProgId="txtfile" ApplicationName="Notepad" />
+
+  <!-- Executables and archives: open as text. WDAC will block their actual
+       execution anyway, but this defeats double-click discovery. -->
+  <Association Identifier=".exe"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".bat"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".cmd"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".ps1"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".vbs"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".js"   ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".zip"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".7z"   ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".rar"  ProgId="txtfile" ApplicationName="Notepad" />
+  <Association Identifier=".iso"  ProgId="txtfile" ApplicationName="Notepad" />
+
+</DefaultAssociations>

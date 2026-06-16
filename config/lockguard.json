@@ -1,0 +1,29 @@
+{
+  "_comment": "Watchdog runtime config. Updated by Install-Lockguard.ps1; the watchdog re-reads on each enforcement tick. Editing this on the target machine has no effect — the registry callback blocks writes; only the recovery uninstall window opens it up.",
+  "version": 1,
+  "printer_ssid": "",
+  "printer_mode": "infrastructure",
+  "enforce_interval_seconds": 30,
+  "heartbeat_timeout_seconds": 90,
+  "blocked_images": [
+    "regedit.exe",
+    "taskmgr.exe",
+    "bcdedit.exe",
+    "procmon.exe",
+    "procmon64.exe",
+    "procexp.exe",
+    "procexp64.exe",
+    "pchunter.exe",
+    "pchunter64.exe",
+    "dbgview.exe",
+    "windbg.exe",
+    "x64dbg.exe",
+    "autoruns.exe",
+    "autorunsc.exe",
+    "powershell_ise.exe"
+  ],
+  "protected_dirs": [
+    "C:\\ProgramData\\Lockguard",
+    "C:\\Windows\\Lockguard-Restore"
+  ]
+}
