@@ -141,7 +141,18 @@ lockguard-cli.exe --recover        # compiled Go client, same protocol
 .\Uninstall-Lockguard.ps1          # full teardown
 ```
 
-The password is stored only as a PBKDF2-derived HMAC verifier (1,000,000 iterations, SHA-256) in HKLM. The driver re-derives independently inside the IOCTL handler. Losing the password means recovery requires booting external media.
+### Changing the password (without uninstalling)
+
+```powershell
+# Either:
+lockguard-cli.exe --set-password   # Go CLI: verify old, prompt new, write
+# or:
+.\Set-LockguardPassword.ps1        # pure PowerShell, same protocol
+```
+
+Both flows ask for the **current** password first (must verify against the existing HMAC verifier), open the permissive window via `IOCTL_UNLOCK`, then prompt for a strength-checked new password (≥ 12 chars, mixed case + digit), and overwrite `HKLM\SYSTEM\Lockguard\Recovery` with a fresh salt + verifier. Wrong current password fails before the driver is touched.
+
+The initial password is set **once** during install (`Install-Lockguard.ps1` Phase 2). After that, `--set-password` is the only way to rotate it. The password is stored only as a PBKDF2-derived HMAC verifier (1,000,000 iterations, SHA-256). The driver re-derives independently inside the IOCTL handler. Losing the password means recovery requires booting external media.
 
 ## Status
 

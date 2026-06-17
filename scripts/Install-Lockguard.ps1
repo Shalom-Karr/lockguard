@@ -121,14 +121,18 @@ if (Test-Path $RecoveryRegPath) {
     New-ItemProperty -Path $RecoveryRegPath -Name 'Iterations'  -Value $iterations -PropertyType DWord  -Force | Out-Null
     New-ItemProperty -Path $RecoveryRegPath -Name 'Verifier'    -Value $verifier   -PropertyType Binary -Force | Out-Null
 
-    # Tighten ACL: SYSTEM + Administrators read-only; driver callback blocks writes.
+    # ACL: SYSTEM full, Administrators read + write (so lockguard-cli.exe
+    # --set-password can rewrite the verifier inside the permissive window).
+    # The driver's registry callback is the actual lock — it blocks every
+    # write to this key OUTSIDE the permissive window, regardless of token.
+    # Users get no access; the verifier is readable to admins by design.
     $acl = Get-Acl $RecoveryRegPath
     $acl.SetAccessRuleProtection($true, $false)
     $acl.Access | ForEach-Object { $acl.RemoveAccessRule($_) | Out-Null }
     $acl.AddAccessRule((New-Object System.Security.AccessControl.RegistryAccessRule(
-        'NT AUTHORITY\SYSTEM', 'ReadKey', 'ContainerInherit,ObjectInherit', 'None', 'Allow')))
+        'NT AUTHORITY\SYSTEM', 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')))
     $acl.AddAccessRule((New-Object System.Security.AccessControl.RegistryAccessRule(
-        'BUILTIN\Administrators', 'ReadKey', 'ContainerInherit,ObjectInherit', 'None', 'Allow')))
+        'BUILTIN\Administrators', 'ReadKey,SetValue,CreateSubKey,Delete', 'ContainerInherit,ObjectInherit', 'None', 'Allow')))
     Set-Acl -Path $RecoveryRegPath -AclObject $acl
 
     # Zeroize sensitive buffers.

@@ -1,17 +1,25 @@
-// lockguard-cli — recovery client. Talks to the lockguard kernel driver
-// over the documented IOCTL protocol to open a 10-minute permissive window.
+// lockguard-cli — recovery / admin client. Talks to the lockguard kernel
+// driver over the documented IOCTL protocol to open a 10-minute permissive
+// window, change the recovery password, or query status.
 //
-//	lockguard-cli.exe --recover           # prompt for password, unlock
+//	lockguard-cli.exe --recover           # prompt for password, unlock for 10 min
+//	lockguard-cli.exe --set-password      # change the recovery / uninstall password
 //	lockguard-cli.exe --status            # print driver status
-//	lockguard-cli.exe --quote             # print the unlock protocol spec
 //
-// On success, prints "Unlocked — 10:00 remaining." Within that window the
-// admin can run Uninstall-Lockguard.ps1, edit protected registry keys,
-// delete the .sys file, etc.
+// On --recover success, prints "Unlocked — 10:00 remaining." Within that
+// window the admin can run Uninstall-Lockguard.ps1, edit protected registry
+// keys, delete the .sys file, etc.
+//
+// --set-password verifies the current password first (same challenge-
+// response as --recover), opens the permissive window, then prompts for and
+// stores a new password. The new password takes effect immediately for
+// future --recover / Uninstall-Lockguard.ps1 runs.
 package main
 
 import (
+	"bytes"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"flag"
 	"fmt"
@@ -39,7 +47,8 @@ const (
 
 func main() {
 	recover := flag.Bool("recover", false, "prompt for password and unlock the driver for 10 minutes")
-	status := flag.Bool("status", false, "print driver status (permissive window, tamper count)")
+	setPw   := flag.Bool("set-password", false, "verify current password then set a new recovery / uninstall password")
+	status  := flag.Bool("status", false, "print driver status (permissive window, tamper count)")
 	flag.Parse()
 
 	switch {
@@ -48,13 +57,18 @@ func main() {
 			fmt.Fprintf(os.Stderr, "recover: %v\n", err)
 			os.Exit(1)
 		}
+	case *setPw:
+		if err := doSetPassword(); err != nil {
+			fmt.Fprintf(os.Stderr, "set-password: %v\n", err)
+			os.Exit(1)
+		}
 	case *status:
 		if err := doStatus(); err != nil {
 			fmt.Fprintf(os.Stderr, "status: %v\n", err)
 			os.Exit(1)
 		}
 	default:
-		fmt.Println("lockguard-cli: recovery client for the Lockguard kernel driver.")
+		fmt.Println("lockguard-cli: recovery / admin client for the Lockguard kernel driver.")
 		flag.PrintDefaults()
 		os.Exit(2)
 	}
@@ -142,6 +156,154 @@ func doStatus() error {
 		fmt.Println("Last heartbeat:    (never)")
 	}
 	return nil
+}
+
+// ---------- set-password ----------
+
+func doSetPassword() error {
+	salt, iter, verifier, err := readRecoveryRegistry()
+	if err != nil {
+		return fmt.Errorf("read HKLM\\%s: %w", recoveryRegKey, err)
+	}
+
+	fmt.Print("Current password: ")
+	curPw, err := term.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Println()
+	if err != nil {
+		return err
+	}
+
+	derived := pbkdf2.Key(curPw, salt, int(iter), derivedKeyLen, sha256.New)
+	zero(curPw)
+
+	mac := hmac.New(sha256.New, derived)
+	mac.Write([]byte(verifierLabel))
+	if !hmac.Equal(mac.Sum(nil), verifier) {
+		zero(derived)
+		return fmt.Errorf("wrong current password")
+	}
+
+	// Open the permissive window so the registry callback allows our write.
+	h, err := openDriver()
+	if err != nil {
+		zero(derived)
+		return err
+	}
+	defer windows.CloseHandle(h)
+
+	nonce, err := ioctlGetNonceCall(h)
+	if err != nil {
+		zero(derived)
+		return fmt.Errorf("get nonce: %w", err)
+	}
+	respMac := hmac.New(sha256.New, derived)
+	respMac.Write(nonce)
+	response := respMac.Sum(nil)
+	if err := ioctlUnlockCall(h, response, derived); err != nil {
+		zero(derived)
+		return fmt.Errorf("unlock: %w", err)
+	}
+	zero(derived)
+	fmt.Println("Current password verified. Permissive window open. Set the new password.")
+
+	newPw, err := readStrongPasswordTwice()
+	if err != nil {
+		return err
+	}
+
+	newSalt := make([]byte, 32)
+	if _, err := rand.Read(newSalt); err != nil {
+		zero(newPw)
+		return err
+	}
+	newIter := uint32(1000000)
+	newDerived := pbkdf2.Key(newPw, newSalt, int(newIter), derivedKeyLen, sha256.New)
+	zero(newPw)
+
+	newMac := hmac.New(sha256.New, newDerived)
+	newMac.Write([]byte(verifierLabel))
+	newVerifier := newMac.Sum(nil)
+	zero(newDerived)
+
+	k, _, err := registry.CreateKey(registry.LOCAL_MACHINE, recoveryRegKey, registry.SET_VALUE)
+	if err != nil {
+		return fmt.Errorf("open registry for write (permissive window may have expired): %w", err)
+	}
+	defer k.Close()
+
+	if err := k.SetBinaryValue("InstallSalt", newSalt); err != nil {
+		return fmt.Errorf("write InstallSalt: %w", err)
+	}
+	if err := k.SetDWordValue("Iterations", newIter); err != nil {
+		return fmt.Errorf("write Iterations: %w", err)
+	}
+	if err := k.SetBinaryValue("Verifier", newVerifier); err != nil {
+		return fmt.Errorf("write Verifier: %w", err)
+	}
+
+	fmt.Println("Password changed.")
+	fmt.Println("The new password is required for any future --recover, --set-password,")
+	fmt.Println("or Uninstall-Lockguard.ps1 run. Store it safely; there is no key file.")
+	return nil
+}
+
+func readStrongPasswordTwice() ([]byte, error) {
+	for {
+		fmt.Print("New password (12+ chars, mixed case + digit): ")
+		a, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println()
+		if err != nil {
+			return nil, err
+		}
+		fmt.Print("Confirm new password: ")
+		b, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println()
+		if err != nil {
+			zero(a)
+			return nil, err
+		}
+
+		ok := func() bool {
+			if !bytes.Equal(a, b) {
+				fmt.Println("Mismatch. Retry.")
+				return false
+			}
+			if len(a) < 12 {
+				fmt.Println("Too short (need ≥ 12 chars).")
+				return false
+			}
+			var hasU, hasL, hasD bool
+			for _, c := range a {
+				switch {
+				case c >= 'A' && c <= 'Z':
+					hasU = true
+				case c >= 'a' && c <= 'z':
+					hasL = true
+				case c >= '0' && c <= '9':
+					hasD = true
+				}
+			}
+			if !hasU {
+				fmt.Println("Need an uppercase letter.")
+				return false
+			}
+			if !hasL {
+				fmt.Println("Need a lowercase letter.")
+				return false
+			}
+			if !hasD {
+				fmt.Println("Need a digit.")
+				return false
+			}
+			return true
+		}()
+
+		zero(b)
+		if ok {
+			return a, nil
+		}
+		zero(a)
+	}
 }
 
 // ---------- registry ----------
