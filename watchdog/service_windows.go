@@ -91,7 +91,9 @@ func serviceRemove() error {
 type lockguardSvc struct{}
 
 func (lockguardSvc) Execute(args []string, r <-chan svc.ChangeRequest, status chan<- svc.Status) (bool, uint32) {
-	const accepts = svc.AcceptStop | svc.AcceptShutdown
+	// Deliberately omit svc.AcceptStop: the watchdog must resist `sc stop lockguard-svc`
+	// and Services.msc termination, even by an admin. Only OS shutdown can stop us cleanly.
+	const accepts = svc.AcceptShutdown
 
 	status <- svc.Status{State: svc.StartPending}
 
@@ -110,12 +112,16 @@ func (lockguardSvc) Execute(args []string, r <-chan svc.ChangeRequest, status ch
 		switch c.Cmd {
 		case svc.Interrogate:
 			status <- c.CurrentStatus
-		case svc.Stop, svc.Shutdown:
+		case svc.Shutdown:
 			status <- svc.Status{State: svc.StopPending}
 			close(stop)
 			<-done
 			status <- svc.Status{State: svc.Stopped}
 			return false, 0
+		case svc.Stop:
+			// AcceptStop is not advertised, so SCM should not deliver svc.Stop.
+			// If it arrives anyway (malformed control packet), refuse it and stay running.
+			status <- svc.Status{State: svc.Running, Accepts: accepts}
 		}
 	}
 }

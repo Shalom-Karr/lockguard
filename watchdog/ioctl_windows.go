@@ -80,12 +80,6 @@ func getStatus() (statusReply, error) {
 
 	var bytesReturned uint32
 	sz := uint32(40) // packed size of statusReply on amd64
-	err = windows.DeviceIoControl(h, ctlStatus, nil, 0,
-		(*byte)(nil), sz, &bytesReturned, nil)
-	if err != nil {
-		return reply, err
-	}
-	// Re-issue with a real buffer (we want the data, not just verify).
 	buf := make([]byte, sz)
 	err = windows.DeviceIoControl(h, ctlStatus, nil, 0, &buf[0], sz, &bytesReturned, nil)
 	if err != nil {

@@ -30,6 +30,16 @@ static const PCWSTR gBlocked[] = {
     L"autorunsc.exe",
     L"powershell_ise.exe",
     L"cmd.exe",     // covered by WDAC, but belt
+    L"mmc.exe",     // blocks services.msc / devmgmt.msc / gpedit.msc snap-in host
+    L"wmic.exe",
+    L"tasklist.exe",
+    L"runas.exe",
+    L"sdbinst.exe",
+    L"mavinject.exe",
+    L"installutil.exe",
+    L"regsvr32.exe",
+    L"schtasks.exe",
+    L"dnscmd.exe",
 };
 
 static PCWSTR LgBasename(PCUNICODE_STRING path)

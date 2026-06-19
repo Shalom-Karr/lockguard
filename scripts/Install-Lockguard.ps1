@@ -79,14 +79,23 @@ try {
     Warn "Restore-point creation failed: $($_.Exception.Message). Continuing — you should still snapshot before installing."
 }
 
+function Read-SecurePlain([string]$prompt) {
+    # Convert a SecureString prompt to a plain string with the unmanaged
+    # backing memory zeroized + freed in finally, so the password doesn't
+    # linger in process memory.
+    $ss  = Read-Host $prompt -AsSecureString
+    $ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToGlobalAllocUnicode($ss)
+    try {
+        return [System.Runtime.InteropServices.Marshal]::PtrToStringUni($ptr)
+    } finally {
+        [System.Runtime.InteropServices.Marshal]::ZeroFreeGlobalAllocUnicode($ptr)
+    }
+}
+
 function Read-StrongPassword {
     while ($true) {
-        $a = Read-Host 'Recovery password (12+ chars, mixed case + digit)' -AsSecureString
-        $b = Read-Host 'Confirm password' -AsSecureString
-        $sa = [System.Runtime.InteropServices.Marshal]::PtrToStringUni(
-              [System.Runtime.InteropServices.Marshal]::SecureStringToGlobalAllocUnicode($a))
-        $sb = [System.Runtime.InteropServices.Marshal]::PtrToStringUni(
-              [System.Runtime.InteropServices.Marshal]::SecureStringToGlobalAllocUnicode($b))
+        $sa = Read-SecurePlain 'Recovery password (12+ chars, mixed case + digit)'
+        $sb = Read-SecurePlain 'Confirm password'
         if ($sa -ne $sb)                { Warn 'Mismatch. Retry.';        continue }
         if ($sa.Length -lt 12)          { Warn 'Too short (<12).';        continue }
         if ($sa -notmatch '[A-Z]')      { Warn 'Need an uppercase letter.'; continue }
@@ -110,6 +119,8 @@ if (Test-Path $RecoveryRegPath) {
                 $pw, $salt, $iterations, [System.Security.Cryptography.HashAlgorithmName]::SHA256)
     $derivedKey = $deriv.GetBytes(32)
     $deriv.Dispose()
+    $pw = $null
+    [System.GC]::Collect()
 
     $label = [System.Text.Encoding]::ASCII.GetBytes('LOCKGUARD-VERIFIER-V1')
     $hmac  = New-Object System.Security.Cryptography.HMACSHA256(,$derivedKey)
@@ -187,6 +198,35 @@ if (Test-Path $cer) {
 
 # ---------- [5/14] Test signing + BCD ----------
 Step 5 'Enable test signing + boot config'
+
+# Secure Boot MUST be OFF before enabling test signing — otherwise the
+# test-signed driver fails to load on reboot, silently breaking the
+# entire lockdown (driver gone, but watchdog/WDAC/etc. all still applied).
+# Bail out hard rather than continue into an unbootable / unprotected state.
+try {
+    $secureBootOn = Confirm-SecureBootUEFI -ErrorAction Stop
+} catch [System.PlatformNotSupportedException] {
+    # Legacy BIOS (non-UEFI) — Secure Boot does not apply. Safe to proceed.
+    $secureBootOn = $false
+    Info 'Legacy BIOS detected (no UEFI) — Secure Boot check skipped.'
+} catch [System.UnauthorizedAccessException] {
+    Die 'Secure Boot state check requires elevation. Re-run from an elevated PowerShell prompt.'
+} catch {
+    Die "Unable to determine Secure Boot state: $($_.Exception.Message). Refusing to enable test signing blindly — verify Secure Boot is OFF in UEFI/BIOS, then re-run."
+}
+
+if ($secureBootOn) {
+    Die @'
+Secure Boot is currently ENABLED. Test-signed drivers will not load while Secure Boot is on, which would leave this machine with the watchdog, WDAC, WLAN filter, and audio mute applied but NO kernel driver — i.e. unprotected.
+
+To proceed:
+  1. Reboot into UEFI/BIOS setup.
+  2. Disable Secure Boot.
+  3. Boot back into Windows.
+  4. Re-run this installer.
+'@
+}
+OK 'Secure Boot is OFF (or N/A on legacy BIOS) — safe to enable test signing.'
 
 & bcdedit.exe /set testsigning on        | Out-Null
 & bcdedit.exe /set bootmenupolicy standard | Out-Null

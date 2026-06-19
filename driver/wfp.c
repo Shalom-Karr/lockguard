@@ -16,7 +16,8 @@ DEFINE_GUID(LG_SUBLAYER_GUID,
     0x3b2c0e9e, 0x9f48, 0x4f6e, 0x9c, 0x7d, 0x1a, 0x1f, 0x9d, 0x4c, 0x2c, 0x10);
 
 static HANDLE  gEngine = NULL;
-static UINT64  gFilterIds[32];
+#define LG_MAX_FILTERS 64
+static UINT64  gFilterIds[LG_MAX_FILTERS];
 static ULONG   gFilterCount = 0;
 
 #define ADD_FILTER_ID(id) do { gFilterIds[gFilterCount++] = (id); } while (0)
@@ -50,8 +51,15 @@ static NTSTATUS LgAddFilter(const GUID* layer,
     f.displayData.description = (wchar_t*)L"Lockguard LAN-only filter";
 
     UINT64 id = 0;
+    if (gFilterCount >= LG_MAX_FILTERS) return STATUS_INSUFFICIENT_RESOURCES;
     NTSTATUS s = FwpmFilterAdd(gEngine, &f, NULL, &id);
-    if (NT_SUCCESS(s)) ADD_FILTER_ID(id);
+    if (NT_SUCCESS(s)) {
+        if (gFilterCount >= LG_MAX_FILTERS) {
+            FwpmFilterDeleteById(gEngine, id);
+            return STATUS_INSUFFICIENT_RESOURCES;
+        }
+        ADD_FILTER_ID(id);
+    }
     return s;
 }
 
@@ -215,11 +223,12 @@ fail:
 VOID LgWfpFinalize(VOID)
 {
     if (gEngine == NULL) return;
-    FwpmTransactionBegin(gEngine, 0);
-    for (ULONG i = 0; i < gFilterCount; ++i)
-        FwpmFilterDeleteById(gEngine, gFilterIds[i]);
-    FwpmSubLayerDeleteByKey(gEngine, &LG_SUBLAYER_GUID);
-    FwpmTransactionCommit(gEngine);
+    if (NT_SUCCESS(FwpmTransactionBegin(gEngine, 0))) {
+        for (ULONG i = 0; i < gFilterCount; ++i)
+            FwpmFilterDeleteById(gEngine, gFilterIds[i]);
+        FwpmSubLayerDeleteByKey(gEngine, &LG_SUBLAYER_GUID);
+        FwpmTransactionCommit(gEngine);
+    }
     FwpmEngineClose(gEngine);
     gEngine = NULL;
     gFilterCount = 0;

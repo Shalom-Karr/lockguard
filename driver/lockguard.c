@@ -31,12 +31,39 @@ static volatile LONG64  gPermissiveExpires = 0;   // 100-ns FILETIME
 static volatile LONG    gTamperCount = 0;
 static volatile LONG64  gLastHeartbeat = 0;
 
-// Loaded once from HKLM\SYSTEM\Lockguard\Recovery at DriverEntry.
+// Loaded once from HKLM\SYSTEM\Lockguard\Recovery at DriverEntry; may be
+// reloaded lazily by LgRecoveryTryReload() if the boot-time load failed.
 static UCHAR  gInstallSalt[LG_SALT_MAX_LEN];
 static ULONG  gInstallSaltLen = 0;
 static ULONG  gIterations = 0;
 static UCHAR  gStoredVerifier[LG_VERIFIER_LEN];
 static BOOLEAN gVerifierLoaded = FALSE;
+static volatile LONG64 gVerifierLastRetry = 0;  // 100-ns FILETIME of last reload attempt
+#define LG_VERIFIER_RETRY_INTERVAL_100NS (10LL * 10000000LL)  // 10 seconds
+
+// Attempt a non-blocking reload of the recovery verifier if it isn't loaded
+// yet. Rate-limited so a flood of IOCTLs can't hammer the registry. Safe to
+// call from any IRQL <= PASSIVE_LEVEL (ZwOpenKey requires PASSIVE).
+static VOID LgRecoveryTryReload(VOID)
+{
+    if (gVerifierLoaded) return;
+    if (KeGetCurrentIrql() > PASSIVE_LEVEL) return;
+
+    LARGE_INTEGER now;
+    KeQuerySystemTime(&now);
+    LONG64 last = gVerifierLastRetry;
+    if (last != 0 && (now.QuadPart - last) < LG_VERIFIER_RETRY_INTERVAL_100NS)
+        return;
+    if (InterlockedCompareExchange64(&gVerifierLastRetry, now.QuadPart, last) != last)
+        return;  // another thread is retrying
+
+    NTSTATUS rvs = LgRecoveryLoadVerifier();
+    if (NT_SUCCESS(rvs)) {
+        DbgPrint("[lockguard] recovery verifier loaded on retry\n");
+    } else {
+        DbgPrint("[lockguard] recovery verifier retry failed: 0x%x\n", rvs);
+    }
+}
 
 // -------- Permissive window --------------------------------------------------
 
@@ -58,6 +85,8 @@ VOID LgEnterPermissiveWindow(VOID)
 
 BOOLEAN LgIsPermissive(VOID)
 {
+    // Fast unsynchronized reject is safe: once gPermissive flips to FALSE it
+    // stays FALSE until the next LgEnterPermissiveWindow().
     if (!gPermissive) return FALSE;
 
     LARGE_INTEGER now;
@@ -69,6 +98,19 @@ BOOLEAN LgIsPermissive(VOID)
     if (gPermissive && !active) {
         gPermissive = FALSE;
         gPermissiveExpires = 0;
+    } else if (active) {
+        // Lease: guarantee the caller a minimum LG_PERMISSIVE_GRACE_SECONDS
+        // of remaining window. Without this, another CPU running
+        // LgIsPermissive at the expiry boundary could flip gPermissive to
+        // FALSE between this callback's check and its return, producing a
+        // TOCTOU where one callback already decided "allow" while a sibling
+        // sees "deny." The extension only fires while we already hold the
+        // lease (active==TRUE), so it cannot resurrect an expired window.
+        LONG64 graceFloor = now.QuadPart +
+            (LONG64)LG_PERMISSIVE_GRACE_SECONDS * 10000000LL;
+        if (gPermissiveExpires < graceFloor) {
+            gPermissiveExpires = graceFloor;
+        }
     }
     KeReleaseSpinLock(&gPermissiveLock, irql);
 
@@ -233,6 +275,11 @@ NTSTATUS LgHandleGetNonce(PIRP Irp, PIO_STACK_LOCATION Stk)
 {
     if (Stk->Parameters.DeviceIoControl.OutputBufferLength < LG_NONCE_LEN)
         return STATUS_BUFFER_TOO_SMALL;
+
+    // If the verifier failed to load at boot (e.g., registry not yet ready),
+    // try again now. This keeps recovery from being permanently disabled by
+    // a transient early-boot failure.
+    LgRecoveryTryReload();
 
     UCHAR nonce[LG_NONCE_LEN];
     NTSTATUS status = LgGenerateRandom(nonce, LG_NONCE_LEN);
@@ -406,8 +453,10 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
     // won't work until the verifier is present on next boot.
     NTSTATUS rvs = LgRecoveryLoadVerifier();
     if (!NT_SUCCESS(rvs)) {
-        DbgPrint("[lockguard] WARN: verifier not loaded (0x%x) — recovery disabled\n",
+        DbgPrint("[lockguard] WARN: verifier not loaded (0x%x) — will retry on next IOCTL_GET_NONCE\n",
                  rvs);
+        // gVerifierLastRetry stays 0 so the first IOCTL_GET_NONCE retries
+        // immediately rather than waiting for the rate-limit window.
     }
 
     status = LgWfpInitialize();

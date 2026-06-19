@@ -7,6 +7,8 @@
  *   HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e972-...}\*  (NIC props)
  *   \Registry\Machine\BCD00000000\*
  *   HKLM\SYSTEM\Lockguard\Recovery\*
+ *   HKLM\Software\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\*  (watchdog's IFEO debugger-trampoline blocks)
+ *   HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\TaskCache\Tree\Microsoft\Windows\Lockguard\*  (respawn tasks)
  *
  * Reads are always allowed. Permissive window: when LgIsPermissive() is TRUE,
  * the callback returns STATUS_SUCCESS for writes too (so recovery + uninstall
@@ -26,6 +28,8 @@ static const PCWSTR gProtectedPrefixes[] = {
     LG_WLANSVC_KEY,
     LG_RECOVERY_KEY,
     LG_NETCLASS_KEY,
+    LG_IFEO_KEY,
+    LG_SCHED_TASK_KEY,
 };
 
 static BOOLEAN LgKeyNameMatchesAny(PCUNICODE_STRING name)

@@ -27,6 +27,8 @@
 #define LG_BCD_KEY         L"\\Registry\\Machine\\BCD00000000"
 #define LG_WLANSVC_KEY     L"\\Registry\\Machine\\SYSTEM\\CurrentControlSet\\Services\\Wlansvc"
 #define LG_NETCLASS_KEY    L"\\Registry\\Machine\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}"
+#define LG_IFEO_KEY        L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options"
+#define LG_SCHED_TASK_KEY  L"\\Registry\\Machine\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\Tree\\Microsoft\\Windows\\Lockguard"
 
 #define LG_PROTECTED_DIR_NT L"\\??\\C:\\ProgramData\\Lockguard"
 #define LG_PROTECTED_SYS_NT L"\\??\\C:\\Windows\\System32\\drivers\\lockguard.sys"
@@ -40,6 +42,14 @@
 
 #define LG_UNLOCK_WINDOW_SECONDS  600  // 10 minutes
 #define LG_NONCE_TTL_SECONDS      60
+// Minimum guaranteed lifetime, in seconds, granted to any callback that
+// observes permissive=true. Closes the TOCTOU race where the window could
+// expire on another CPU between a callback's LgIsPermissive() check and its
+// completion of the allow decision: once a check returns TRUE we bump
+// gPermissiveExpires to at least now + LG_PERMISSIVE_GRACE_SECONDS so
+// concurrent in-flight callbacks also see TRUE for that long. The extension
+// is bounded — once the original window is past, no extension fires.
+#define LG_PERMISSIVE_GRACE_SECONDS 2
 
 // Custom IOCTLs. METHOD_BUFFERED + FILE_ANY_ACCESS so an unprivileged caller
 // can open the device; the actual auth happens inside the unlock handler.

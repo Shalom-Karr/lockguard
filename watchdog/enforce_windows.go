@@ -19,8 +19,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
+
+	"golang.org/x/sys/windows/registry"
+)
+
+// BCD output is locale-translated and column spacing varies by Windows
+// version; match key/value pairs with a case-insensitive whitespace-tolerant
+// regex rather than fixed English substrings.
+var (
+	bcdTestSigningRe   = regexp.MustCompile(`(?i)\btestsigning\s+yes\b`)
+	bcdBootMenuStdRe   = regexp.MustCompile(`(?i)\bbootmenupolicy\s+standard\b`)
+	bcdSafeBootPresent = regexp.MustCompile(`(?i)\bsafeboot\b`)
 )
 
 const (
@@ -115,14 +127,19 @@ func ensureAudioEndpointDisabled() error  { return ensureServiceDisabled("AudioE
 
 func ensureBCDState() error {
 	// Confirm test-signing=on, bootmenupolicy=standard, safeboot absent.
+	//
+	// bcdedit.exe must NOT appear in blockedImages below — the IFEO Debugger
+	// trampoline would otherwise prevent our own watchdog from invoking it.
+	// Output is parsed with case-insensitive, whitespace-tolerant regexes so
+	// it works on non-English Windows and across column-width changes.
 	out, _ := runQuiet("bcdedit.exe", "/enum", "{current}")
-	if !strings.Contains(strings.ToLower(out), "testsigning             yes") {
+	if !bcdTestSigningRe.MatchString(out) {
 		runQuiet("bcdedit.exe", "/set", "testsigning", "on")
 	}
-	if !strings.Contains(strings.ToLower(out), "bootmenupolicy          standard") {
+	if !bcdBootMenuStdRe.MatchString(out) {
 		runQuiet("bcdedit.exe", "/set", "bootmenupolicy", "standard")
 	}
-	if strings.Contains(strings.ToLower(out), "safeboot") {
+	if bcdSafeBootPresent.MatchString(out) {
 		runQuiet("bcdedit.exe", "/deletevalue", "safeboot")
 	}
 	return nil
@@ -142,19 +159,19 @@ func ensureWDACPolicy() error {
 		return fmt.Errorf("no policy on disk and no backup at %s", backup)
 	}
 	dst := filepath.Join(wdacPolicyDir, "lockguard.cip")
-	if err := copyFile(backup, dst); err != nil {
-		return err
-	}
-	_, err = runQuiet("CiTool.exe", "--update-policy", dst)
-	return err
+	// Copy the .cip into the CiPolicies\Active directory. On Win10 1903+ /
+	// Win11 multi-policy format this file-drop is the native CI deployment
+	// mechanism: the policy is loaded by the CI driver at next boot. We
+	// intentionally do NOT shell out to CiTool.exe here because CiTool is
+	// not on the WDAC allowlist, so WDAC would block its execution and the
+	// watchdog would be unable to recover. The file presence in Active is
+	// what persists the policy across reboots.
+	return copyFile(backup, dst)
 }
 
 func ensureWLANFilter() error {
-	out, _ := runQuiet("netsh.exe", "wlan", "show", "filters")
-	if strings.Contains(out, "Permit") && strings.Contains(out, "Deny") {
-		return nil
-	}
-	// Re-apply from saved config (lockguard.json carries the SSID).
+	// netsh.exe is denied by WDAC, so we drive WlanAPI directly via
+	// wlanapi.dll in-proc. See wlan_windows.go.
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
@@ -162,17 +179,20 @@ func ensureWLANFilter() error {
 	if cfg.PrinterSSID == "" {
 		return nil // nothing to do; install hasn't picked an SSID yet
 	}
-	runQuiet("netsh.exe", "wlan", "add", "filter",
-		"permission=allow", "ssid="+cfg.PrinterSSID, "networktype=infrastructure")
-	runQuiet("netsh.exe", "wlan", "add", "filter",
-		"permission=denyall", "networktype=infrastructure")
-	runQuiet("netsh.exe", "wlan", "add", "filter",
-		"permission=denyall", "networktype=adhoc")
-	return nil
+	ok, err := wlanFiltersOK(cfg.PrinterSSID)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
+	return applyWLANFilters(cfg.PrinterSSID)
 }
 
+// NOTE: bcdedit.exe is intentionally NOT in this list — ensureBCDState()
+// needs to invoke it. Other admin-recovery tools remain blocked.
 var blockedImages = []string{
-	"regedit.exe", "taskmgr.exe", "bcdedit.exe",
+	"regedit.exe", "taskmgr.exe",
 	"procmon.exe", "procmon64.exe",
 	"procexp.exe", "procexp64.exe",
 	"pchunter.exe", "pchunter64.exe",
@@ -184,11 +204,21 @@ var blockedImages = []string{
 func ensureIFEOBlocks() error {
 	// Each blocked image gets an IFEO "Debugger" value pointing at a no-op
 	// trampoline (lockguard-svc.exe --silent-exit) so launches exit instantly.
+	// Use the native registry API so we don't depend on reg.exe (which WDAC
+	// denies once the policy is enforcing).
 	exe, _ := os.Executable()
+	debugger := fmt.Sprintf(`"%s" --silent-exit`, exe)
+	const ifeoBase = `Software\Microsoft\Windows NT\CurrentVersion\Image File Execution Options`
 	for _, img := range blockedImages {
-		key := `HKLM\Software\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\` + img
-		runQuiet("reg.exe", "add", key, "/v", "Debugger", "/t", "REG_SZ",
-			"/d", fmt.Sprintf(`"%s" --silent-exit`, exe), "/f")
+		k, _, err := registry.CreateKey(registry.LOCAL_MACHINE, ifeoBase+`\`+img, registry.SET_VALUE)
+		if err != nil {
+			log.Printf("[ifeo] create %s: %v", img, err)
+			continue
+		}
+		if err := k.SetStringValue("Debugger", debugger); err != nil {
+			log.Printf("[ifeo] set %s: %v", img, err)
+		}
+		k.Close()
 	}
 	return nil
 }

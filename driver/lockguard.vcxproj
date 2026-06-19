@@ -51,7 +51,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>$(DDK_LIB_PATH)\fwpkclnt.lib;$(DDK_LIB_PATH)\fltmgr.lib;$(DDK_LIB_PATH)\ksecdd.lib;$(DDK_LIB_PATH)\uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(DDK_LIB_PATH)\bcrypt.lib;$(DDK_LIB_PATH)\fwpkclnt.lib;$(DDK_LIB_PATH)\fltmgr.lib;$(DDK_LIB_PATH)\ksecdd.lib;$(DDK_LIB_PATH)\uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Inf>
       <SpecifyArchitecture>true</SpecifyArchitecture>

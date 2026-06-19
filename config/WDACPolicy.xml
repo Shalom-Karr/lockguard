@@ -11,6 +11,8 @@
   Denies (explicit, win over Windows defaults):
     - cmd.exe, powershell.exe, powershell_ise.exe, wscript.exe, cscript.exe
     - mshta.exe, regedit.exe, taskmgr.exe, bcdedit.exe, sc.exe, net.exe
+    - rundll32.exe (LOLBin — loads arbitrary DLL exports, used as a generic
+      code-execution proxy; not needed by winword/explorer/msedge/lockguard).
     - All scripting hosts the friend could use to bootstrap something else.
 
   Compile with:
@@ -44,7 +46,6 @@
     <Allow ID="ID_ALLOW_MSEDGE"     FriendlyName="Microsoft Edge"    FileName="MSEDGE.EXE" />
     <Allow ID="ID_ALLOW_NOTEPAD"    FriendlyName="Notepad"           FileName="NOTEPAD.EXE" />
     <Allow ID="ID_ALLOW_PRINTUI"    FriendlyName="Print Dialog"      FileName="PRINTUI.EXE" />
-    <Allow ID="ID_ALLOW_RUNDLL32"   FriendlyName="rundll32"          FileName="RUNDLL32.EXE" />
     <Allow ID="ID_ALLOW_SPOOLSV"    FriendlyName="Print Spooler"     FileName="SPOOLSV.EXE" />
     <Allow ID="ID_ALLOW_SVCHOST"    FriendlyName="Service Host"      FileName="SVCHOST.EXE" />
     <Allow ID="ID_ALLOW_DWM"        FriendlyName="Desktop Window Mgr" FileName="DWM.EXE" />
@@ -74,6 +75,7 @@
     <Deny  ID="ID_DENY_NET1"       FriendlyName="net1"               FileName="NET1.EXE" />
     <Deny  ID="ID_DENY_NETSH"      FriendlyName="netsh"              FileName="NETSH.EXE" />
     <Deny  ID="ID_DENY_REG"        FriendlyName="reg"                FileName="REG.EXE" />
+    <Deny  ID="ID_DENY_RUNDLL32"   FriendlyName="rundll32"           FileName="RUNDLL32.EXE" />
   </FileRules>
 
   <Signers />
@@ -90,7 +92,6 @@
           <FileRuleRef RuleID="ID_ALLOW_MSEDGE" />
           <FileRuleRef RuleID="ID_ALLOW_NOTEPAD" />
           <FileRuleRef RuleID="ID_ALLOW_PRINTUI" />
-          <FileRuleRef RuleID="ID_ALLOW_RUNDLL32" />
           <FileRuleRef RuleID="ID_ALLOW_SPOOLSV" />
           <FileRuleRef RuleID="ID_ALLOW_SVCHOST" />
           <FileRuleRef RuleID="ID_ALLOW_DWM" />
@@ -120,6 +121,7 @@
           <FileRuleRef RuleID="ID_DENY_NET1" />
           <FileRuleRef RuleID="ID_DENY_NETSH" />
           <FileRuleRef RuleID="ID_DENY_REG" />
+          <FileRuleRef RuleID="ID_DENY_RUNDLL32" />
         </FileRulesRef>
       </ProductSigners>
     </SigningScenario>
